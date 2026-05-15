@@ -248,23 +248,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.btn-retry {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 8px 14px;
-  transition: background 0.15s ease;
-}
-
-.btn-retry:hover {
-  background: var(--accent-hover);
-}
-
 .btn-download {
   flex: 1;
   background: var(--green);

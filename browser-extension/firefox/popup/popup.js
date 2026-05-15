@@ -1,7 +1,6 @@
 "use strict";
 
 const api = typeof browser !== "undefined" ? browser : chrome;
-const POPUP_TIMEOUT_MS = 20000;
 
 const views = {
   loading: document.getElementById("view-loading"),
@@ -48,7 +47,7 @@ function filterAndSortFormats(formats) {
     return aRes - bRes;
   });
 
-  let result = [...videoFormats];
+  const result = [...videoFormats];
   if (audioFormat) result.push(audioFormat);
   return result;
 }
@@ -86,29 +85,10 @@ function populateFormats(formats) {
 }
 
 let currentVideoInfo = null;
-let formatError = false;
-
-function showRetryBtn(show) {
-  let btn = document.getElementById("btn-retry");
-  if (!btn && show) {
-    btn = document.createElement("button");
-    btn.id = "btn-retry";
-    btn.className = "btn-retry";
-    btn.textContent = "Retry";
-    btn.addEventListener("click", fetchFormats);
-    document.querySelector(".controls").appendChild(btn);
-  }
-  if (btn) btn.style.display = show ? "" : "none";
-}
 
 function sendToBackground(msg) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("Request timed out. Is YDM running?"));
-    }, POPUP_TIMEOUT_MS);
-
     api.runtime.sendMessage(msg, (response) => {
-      clearTimeout(timer);
       if (api.runtime.lastError) {
         reject(new Error(api.runtime.lastError.message));
         return;
@@ -162,12 +142,8 @@ async function init() {
 async function fetchFormats() {
   if (!currentVideoInfo) return;
 
-  showRetryBtn(false);
-  formatError = false;
-
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
-  elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   setStatus("loading", "Fetching available formats\u2026");
 
   try {
@@ -177,27 +153,20 @@ async function fetchFormats() {
     });
 
     if (resp && resp.error) {
-      formatError = true;
       setStatus("error", resp.error);
-      showRetryBtn(true);
       return;
     }
 
     const formats = (resp && resp.formats) ? resp.formats : resp;
     if (!Array.isArray(formats) || formats.length === 0) {
-      formatError = true;
       setStatus("error", "No formats returned by YDM server.");
-      showRetryBtn(true);
       return;
     }
 
     populateFormats(formats);
-    const count = elFormatSelect.options.length;
-    setStatus("success", count + " option(s) loaded.");
+    setStatus("success", elFormatSelect.options.length + " option(s) loaded.");
   } catch (err) {
-    formatError = true;
     setStatus("error", "Error: " + err.message);
-    showRetryBtn(true);
   }
 }
 
