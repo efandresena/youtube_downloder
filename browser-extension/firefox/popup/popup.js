@@ -14,8 +14,6 @@ const elThumbnail = document.getElementById("thumbnail");
 const elVideoTitle = document.getElementById("video-title");
 const elFormatSelect = document.getElementById("format-select");
 const elRenameInput = document.getElementById("rename-input");
-const elPathInput = document.getElementById("path-input");
-const elBtnBrowse = document.getElementById("btn-browse");
 const elBtnDownload = document.getElementById("btn-download");
 const elStatusDot = document.getElementById("status-dot");
 const elStatusText = document.getElementById("status-text");
@@ -150,7 +148,6 @@ async function init() {
   elVideoTitle.textContent = videoInfo.title || "(Unknown title)";
 
   elRenameInput.value = videoInfo.title || "";
-  elPathInput.value = "~/Downloads";
 
   elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   elFormatSelect.disabled = true;
@@ -204,23 +201,6 @@ async function fetchFormats() {
   }
 }
 
-elBtnBrowse.addEventListener("click", async () => {
-  try {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.webkitdirectory = true;
-    input.style.display = "none";
-    input.addEventListener("change", () => {
-      if (input.files.length > 0) {
-        elPathInput.value = input.files[0].webkitRelativePath.split("/")[0] || input.files[0].path || elPathInput.value;
-      }
-    });
-    input.click();
-  } catch {
-    elPathInput.value = prompt("Enter download folder path:", elPathInput.value) || elPathInput.value;
-  }
-});
-
 elBtnDownload.addEventListener("click", async () => {
   if (!currentVideoInfo) return;
 
@@ -231,7 +211,6 @@ elBtnDownload.addEventListener("click", async () => {
   }
 
   const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
-  const customPath = elPathInput.value.trim() || "";
 
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
@@ -243,7 +222,6 @@ elBtnDownload.addEventListener("click", async () => {
       url: currentVideoInfo.url,
       format_id: formatId,
       title: customTitle,
-      save_path: customPath,
     });
 
     if (resp && resp.error) {

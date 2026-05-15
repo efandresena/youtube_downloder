@@ -167,10 +167,9 @@ html, body {
   align-items: center;
 }
 
-/* ── Input Fields ─────────────────────────────────────────────────────────── */
+/* ── Rename Input ─────────────────────────────────────────────────────────── */
 
-.rename-row,
-.path-row {
+.rename-row {
   margin-top: 2px;
 }
 
@@ -247,19 +246,6 @@ button {
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.btn-browse {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 8px 12px;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.btn-browse:not(:disabled):hover {
-  background: #174080;
 }
 
 .btn-retry {

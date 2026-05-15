@@ -13,8 +13,6 @@ const elThumbnail    = document.getElementById("thumbnail");
 const elVideoTitle   = document.getElementById("video-title");
 const elFormatSelect = document.getElementById("format-select");
 const elRenameInput  = document.getElementById("rename-input");
-const elPathInput    = document.getElementById("path-input");
-const elBtnBrowse    = document.getElementById("btn-browse");
 const elBtnDownload  = document.getElementById("btn-download");
 const elStatusDot    = document.getElementById("status-dot");
 const elStatusText   = document.getElementById("status-text");
@@ -87,6 +85,20 @@ function populateFormats(formats) {
 }
 
 let currentVideoInfo = null;
+let formatError = false;
+
+function showRetryBtn(show) {
+  let btn = document.getElementById("btn-retry");
+  if (!btn && show) {
+    btn = document.createElement("button");
+    btn.id = "btn-retry";
+    btn.className = "btn-retry";
+    btn.textContent = "Retry";
+    btn.addEventListener("click", fetchFormats);
+    document.querySelector(".controls").appendChild(btn);
+  }
+  if (btn) btn.style.display = show ? "" : "none";
+}
 
 function sendToBackground(msg) {
   return new Promise((resolve, reject) => {
@@ -133,7 +145,6 @@ async function init() {
   elVideoTitle.textContent = videoInfo.title || "(Unknown title)";
 
   elRenameInput.value = videoInfo.title || "";
-  elPathInput.value = "~/Downloads";
 
   elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   elFormatSelect.disabled = true;
@@ -143,21 +154,6 @@ async function init() {
   setStatus("loading", "Fetching available formats\u2026");
 
   await fetchFormats();
-}
-
-let formatError = false;
-
-function showRetryBtn(show) {
-  let btn = document.getElementById("btn-retry");
-  if (!btn && show) {
-    btn = document.createElement("button");
-    btn.id = "btn-retry";
-    btn.className = "btn-retry";
-    btn.textContent = "Retry";
-    btn.addEventListener("click", fetchFormats);
-    document.querySelector(".controls").appendChild(btn);
-  }
-  if (btn) btn.style.display = show ? "" : "none";
 }
 
 async function fetchFormats() {
@@ -202,19 +198,6 @@ async function fetchFormats() {
   }
 }
 
-elBtnBrowse.addEventListener("click", async () => {
-  try {
-    if (window.showDirectoryPicker) {
-      const dirHandle = await window.showDirectoryPicker();
-      elPathInput.value = dirHandle.name;
-    } else {
-      elPathInput.value = prompt("Enter download folder path:", elPathInput.value) || elPathInput.value;
-    }
-  } catch {
-    // user cancelled or API not available
-  }
-});
-
 elBtnDownload.addEventListener("click", async () => {
   if (!currentVideoInfo) return;
 
@@ -225,7 +208,6 @@ elBtnDownload.addEventListener("click", async () => {
   }
 
   const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
-  const customPath = elPathInput.value.trim() || "";
 
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
@@ -237,7 +219,6 @@ elBtnDownload.addEventListener("click", async () => {
       url: currentVideoInfo.url,
       format_id: formatId,
       title: customTitle,
-      save_path: customPath,
     });
 
     if (resp && resp.error) {
