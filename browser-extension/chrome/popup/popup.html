@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YDM</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-logo" aria-hidden="true">&#8659;</div>
+    <div>
+      <div class="header-title">YDM</div>
+      <div class="header-subtitle">YouTube Download Manager</div>
+    </div>
+  </div>
+
+  <!-- ── Not on a YouTube video page ───────────────────────────────────── -->
+  <div id="view-no-video" class="content state-message hidden">
+    <div class="icon">&#127916;</div>
+    <div class="title">No video detected</div>
+    <div class="subtitle">Navigate to a YouTube video page to use YDM.</div>
+  </div>
+
+  <!-- ── YDM app not running ────────────────────────────────────────────── -->
+  <div id="view-no-app" class="content state-message hidden">
+    <div class="icon">&#9888;</div>
+    <div class="title">YDM is not running</div>
+    <div class="subtitle">Please start the YDM desktop application first.</div>
+  </div>
+
+  <!-- ── Loading / initial ping ─────────────────────────────────────────── -->
+  <div id="view-loading" class="content state-message">
+    <div class="spinner"></div>
+    <div class="subtitle">Connecting to YDM&hellip;</div>
+  </div>
+
+  <!-- ── Main download view ─────────────────────────────────────────────── -->
+  <div id="view-main" class="content hidden">
+
+    <!-- Thumbnail -->
+    <div class="thumbnail-wrap" id="thumbnail-wrap">
+      <img id="thumbnail" src="" alt="Video thumbnail" />
+    </div>
+
+    <!-- Title -->
+    <div id="video-title" class="video-title"></div>
+
+    <!-- Controls -->
+    <div class="controls">
+
+      <!-- Format select -->
+      <div class="control-row">
+        <select id="format-select" disabled>
+          <option value="">Loading formats…</option>
+        </select>
+      </div>
+
+      <!-- Rename input -->
+      <div class="control-row rename-row">
+        <input type="text" id="rename-input" placeholder="Filename (without extension)" />
+      </div>
+
+      <!-- Download row -->
+      <div class="control-row">
+        <button class="btn-download" id="btn-download" disabled>
+          &#8659;&nbsp; Download
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-dot idle" id="status-dot"></div>
+      <div class="status-text" id="status-text">Ready.</div>
+    </div>
+
+  </div>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+  <div class="footer">YDM v1.0 &mdash; localhost:50123</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "manifest_version": 2,
+  "name": "YDM - YouTube Download Manager",
+  "version": "1.0.0",
+  "description": "One-click YouTube downloads via YDM. Detects videos, fetches formats, and sends to the YDM desktop app.",
+  "author": "YDM Project",
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "notifications",
+    "nativeMessaging",
+    "*://www.youtube.com/*",
+    "*://youtube.com/*"
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "YDM - YouTube Download Manager",
+    "default_popup": "popup/popup.html"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ydm@ydm.com",
+      "strict_min_version": "91.0"
+    }
+  }
+}

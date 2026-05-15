@@ -1,0 +1,9 @@
+{
+  "name": "com.ydm.native_host",
+  "description": "YDM Native Messaging Host — bridges the Chrome/Brave extension to the YDM desktop app.",
+  "path": "__NATIVE_HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__EXTENSION_ID__/"
+  ]
+}

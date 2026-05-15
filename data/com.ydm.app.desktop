@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=YDM - YouTube Download Manager
+Comment=Download YouTube videos with ease
+# INSTALL_PATH is replaced by install.sh at installation time
+Exec=python3 INSTALL_PATH/ydm/main.py
+Icon=video-display
+Terminal=false
+Type=Application
+Categories=Network;Video;
+Keywords=youtube;download;video;
+StartupWMClass=com.ydm.app
