@@ -51,6 +51,7 @@ class QueueManager:
     def __init__(self, database: Database, downloader: Downloader) -> None:
         self._db: Database = database
         self._dl: Downloader = downloader
+        self._dl.on_file_conflict = self._handle_file_conflict
 
         # Ordered list of all tracked items (includes completed/failed/cancelled)
         self.queue: list[DownloadItem] = []
@@ -63,6 +64,10 @@ class QueueManager:
 
         # GUI callback — called with (DownloadItem,) on every state change
         self.on_item_updated: Optional[Callable[[DownloadItem], None]] = None
+
+        # File conflict callback — called with (filename,) from download thread
+        # Must return "overwrite", "rename", or "cancel"
+        self.on_file_conflict: Optional[Callable[[str], str]] = None
 
         # Mutex for queue / active dict mutations
         self._queue_lock: threading.Lock = threading.Lock()
@@ -84,6 +89,15 @@ class QueueManager:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _handle_file_conflict(self, filename: str) -> str:
+        """Called from download thread when target file exists."""
+        if self.on_file_conflict is not None:
+            try:
+                return self.on_file_conflict(filename)
+            except Exception as exc:
+                logger.warning("on_file_conflict callback raised: %s", exc)
+        return "rename"
 
     def _notify(self, item: DownloadItem) -> None:
         """
@@ -123,8 +137,7 @@ class QueueManager:
 
     def remove(self, item_id: str) -> bool:
         """
-        Remove an item from the queue.  Only items that are NOT currently
-        downloading may be removed this way; use cancel() first if needed.
+        Remove an item from the queue and database.
 
         Returns True if the item was removed, False if not found or active.
         """
@@ -137,7 +150,8 @@ class QueueManager:
             for i, item in enumerate(self.queue):
                 if item.id == item_id:
                     del self.queue[i]
-                    logger.debug("Removed %s from queue", item_id)
+                    self._db.delete_download(item_id)
+                    logger.debug("Removed %s from queue and DB", item_id)
                     return True
         return False
 

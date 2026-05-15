@@ -25,6 +25,7 @@ Every UI mutation in that path goes through GLib.idle_add().
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 import gi
@@ -237,8 +238,36 @@ class MainWindow(Adw.ApplicationWindow):
         """Register the queue update callback with the QueueManager."""
         try:
             self._qm.set_update_callback(self._on_item_updated)
+            self._qm.on_file_conflict = self._show_file_conflict_dialog
         except Exception as exc:
             logger.warning("Could not register update callback: %s", exc)
+
+    def _show_file_conflict_dialog(self, filename: str) -> str:
+        """Show a dialog asking overwrite/rename/cancel. Called from download thread."""
+        result = ["rename"]
+        event = threading.Event()
+
+        def _show() -> bool:
+            dialog = Adw.AlertDialog(
+                heading="File already exists",
+                body=f'"{filename}" already exists in the download folder.',
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("rename", "Rename")
+            dialog.add_response("overwrite", "Overwrite")
+            dialog.set_default_response("rename")
+            dialog.set_close_response("cancel")
+            dialog.connect("response", _on_response)
+            dialog.present(self)
+            return GLib.SOURCE_REMOVE
+
+        def _on_response(_dialog, response: str) -> None:
+            result[0] = response
+            event.set()
+
+        GLib.idle_add(_show)
+        event.wait()
+        return result[0]
 
     def _load_existing(self) -> None:
         """Populate the list with any items already in the queue/history."""
@@ -263,16 +292,21 @@ class MainWindow(Adw.ApplicationWindow):
             row = self._rows[item.id]
             row.update(item)
         else:
-            row = DownloadRow(item, self._qm)
+            row = DownloadRow(item, self._qm, on_remove_cb=self._on_row_removed)
             self._rows[item.id] = row
             self._download_list.append(row)
-            # Notify on status changes via notifications (lazy import to avoid circulars)
             self._maybe_notify(item)
 
         self._apply_filter_to_row(row)
         self._refresh_empty_state()
         self._update_status_bar()
         return GLib.SOURCE_REMOVE
+
+    def _on_row_removed(self, item_id: str) -> None:
+        """Called after a download row has been removed from the list."""
+        self._rows.pop(item_id, None)
+        self._refresh_empty_state()
+        self._update_status_bar()
 
     def _maybe_notify(self, item: "DownloadItem") -> None:
         """Fire a desktop notification if the application owns one."""

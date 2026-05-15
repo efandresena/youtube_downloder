@@ -19,6 +19,7 @@ NOTE FOR GUI LAYER:
 import glob
 import logging
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -116,6 +117,8 @@ class Downloader:
         # Maps item.id → _DownloadState
         self._states: dict[str, _DownloadState] = {}
         self._states_lock: threading.Lock = threading.Lock()
+        # Callback for file conflicts: fn(filename) -> "overwrite" | "rename" | "cancel"
+        self.on_file_conflict: Callable | None = None
 
     # ------------------------------------------------------------------
     # Format discovery
@@ -332,10 +335,34 @@ class Downloader:
 
         if item.title:
             safe_title = self._sanitize_title(item.title)
-            outtmpl = os.path.join(save_path, safe_title + ".%(ext)s")
+            ext_placeholder = ".%(ext)s"
+            outtmpl = os.path.join(save_path, safe_title + ext_placeholder)
         else:
             safe_title = None
-            outtmpl = os.path.join(save_path, "%(title)s.%(ext)s")
+            ext_placeholder = ".%(ext)s"
+            outtmpl = os.path.join(save_path, "%(title)s" + ext_placeholder)
+
+        # Check for file conflicts before downloading
+        nooverwrites = True
+        if safe_title and self.on_file_conflict:
+            if is_audio_only:
+                target_ext = "mp3"
+            else:
+                target_ext = "mp4"
+            target_path = os.path.join(save_path, f"{safe_title}.{target_ext}")
+            if os.path.exists(target_path):
+                choice = self.on_file_conflict(os.path.basename(target_path))
+                if choice == "overwrite":
+                    nooverwrites = False
+                elif choice == "rename":
+                    base = safe_title
+                    counter = 1
+                    while os.path.exists(os.path.join(save_path, f"{base}_{counter}.{target_ext}")):
+                        counter += 1
+                    safe_title = f"{base}_{counter}"
+                    outtmpl = os.path.join(save_path, safe_title + ext_placeholder)
+                else:
+                    raise _CancelDownloadError("Download cancelled by user")
 
         ydl_opts: dict[str, Any] = {
             "format": item.format_id,
@@ -344,7 +371,7 @@ class Downloader:
             "no_warnings": True,
             "progress_hooks": [_progress_hook],
             "merge_output_format": "mp4",
-            "nooverwrites": True,
+            "nooverwrites": nooverwrites,
         }
 
         if is_audio_only:

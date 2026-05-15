@@ -104,10 +104,11 @@ class DownloadRow(Gtk.ListBoxRow):
       [Thumbnail]  [Info column (expand)]  [Action buttons (vertical)]
     """
 
-    def __init__(self, item: "DownloadItem", queue_manager: "QueueManager") -> None:
+    def __init__(self, item: "DownloadItem", queue_manager: "QueueManager", on_remove_cb=None) -> None:
         super().__init__()
         self._item = item
         self._qm = queue_manager
+        self._on_remove_cb = on_remove_cb
         self._thumb_url_loaded: str | None = None  # track which URL was fetched
 
         self.set_activatable(False)
@@ -201,6 +202,10 @@ class DownloadRow(Gtk.ListBoxRow):
         self._btn_open.add_css_class("suggested-action")
         btn_box.append(self._btn_open)
 
+        self._btn_open_folder = Gtk.Button(label="Open Folder")
+        self._btn_open_folder.connect("clicked", self._on_open_folder)
+        btn_box.append(self._btn_open_folder)
+
         self._btn_remove = Gtk.Button(label="Remove")
         self._btn_remove.connect("clicked", self._on_remove)
         self._btn_remove.add_css_class("destructive-action")
@@ -277,6 +282,11 @@ class DownloadRow(Gtk.ListBoxRow):
 
         # Open File — only when completed
         self._btn_open.set_visible(status_key == "completed")
+
+        # Open Folder — only when completed and filename is set
+        self._btn_open_folder.set_visible(
+            status_key == "completed" and bool(item.filename)
+        )
 
         # Remove — always visible; disabled while actively downloading
         self._btn_remove.set_visible(True)
@@ -363,9 +373,22 @@ class DownloadRow(Gtk.ListBoxRow):
         except Exception as exc:
             logger.warning("open_file failed: %s", exc)
 
+    def _on_open_folder(self, _btn: Gtk.Button) -> None:
+        try:
+            folder = self._item.save_path or os.path.expanduser("~/Downloads")
+            Gio.AppInfo.launch_default_for_uri(f"file://{folder}", None)
+        except Exception as exc:
+            logger.warning("open_folder failed: %s", exc)
+
     def _on_remove(self, _btn: Gtk.Button) -> None:
         try:
+            self._qm.cancel(self._item.id)
             self._qm.remove(self._item.id)
+            if self._on_remove_cb:
+                self._on_remove_cb(self._item.id)
+            parent = self.get_parent()
+            if parent is not None:
+                parent.remove(self)
         except Exception as exc:
             logger.warning("remove failed: %s", exc)
 
