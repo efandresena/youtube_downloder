@@ -36,7 +36,7 @@ function filterAndSortFormats(formats) {
   formats.forEach(fmt => {
     if (fmt.vcodec === "none" || fmt.resolution === "audio only") {
       if (!audioFormat) audioFormat = fmt;
-    } else if (fmt.ext === "mp4") {
+    } else if (fmt.vcodec !== "none") {
       videoFormats.push(fmt);
     }
   });
@@ -59,6 +59,7 @@ function formatBytes(bytes) {
 
 function populateFormats(formats) {
   elFormatSelect.innerHTML = "";
+  formatMap = {};
 
   const filtered = filterAndSortFormats(formats);
 
@@ -72,10 +73,12 @@ function populateFormats(formats) {
   }
 
   filtered.forEach((fmt) => {
+    formatMap[fmt.format_id] = fmt;
     const opt = document.createElement("option");
     opt.value = fmt.format_id;
     let label = fmt.label || fmt.resolution + " " + (fmt.ext || "").toUpperCase();
     if (fmt.filesize) label += " (~" + formatBytes(fmt.filesize) + ")";
+    if (fmt.acodec === "none" && fmt.vcodec !== "none") label += " [no audio - will merge]";
     opt.textContent = label;
     elFormatSelect.appendChild(opt);
   });
@@ -85,6 +88,7 @@ function populateFormats(formats) {
 }
 
 let currentVideoInfo = null;
+let formatMap = {};
 
 function sendToBackground(msg) {
   return new Promise((resolve, reject) => {
@@ -179,6 +183,12 @@ elBtnDownload.addEventListener("click", async () => {
     return;
   }
 
+  const fmt = formatMap[formatId];
+  let finalFormatId = formatId;
+  if (fmt && fmt.acodec === "none" && fmt.vcodec !== "none") {
+    finalFormatId = formatId + "+bestaudio";
+  }
+
   const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
 
   elBtnDownload.disabled = true;
@@ -189,7 +199,7 @@ elBtnDownload.addEventListener("click", async () => {
     const resp = await sendToBackground({
       action: "download",
       url: currentVideoInfo.url,
-      format_id: formatId,
+      format_id: finalFormatId,
       title: customTitle,
     });
 
