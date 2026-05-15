@@ -217,19 +217,19 @@ class YDMServer:
             status=DownloadStatus.QUEUED,
         )
 
-        # If title is missing, try a quick metadata fetch in the executor.
-        # We don't block the queue on this — the downloader will fill it in.
-        if not title:
-            loop = asyncio.get_running_loop()
-            try:
-                title_info = await loop.run_in_executor(
-                    self._executor, self._fetch_title, url
-                )
-                if title_info:
-                    item.title = title_info.get("title", "")
-                    item.thumbnail_url = title_info.get("thumbnail", "")
-            except Exception as exc:
-                logger.warning("Could not prefetch title for %s: %s", url, exc)
+        # Always try to fetch metadata for thumbnail and title
+        loop = asyncio.get_running_loop()
+        try:
+            meta = await loop.run_in_executor(
+                self._executor, self._fetch_title, url
+            )
+            if meta:
+                if not item.title:
+                    item.title = meta.get("title", "")
+                if meta.get("thumbnail"):
+                    item.thumbnail_url = meta.get("thumbnail", "")
+        except Exception as exc:
+            logger.warning("Could not prefetch metadata for %s: %s", url, exc)
 
         # Queue the download (this is thread-safe)
         self._qm.add(item)
