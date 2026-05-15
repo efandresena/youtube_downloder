@@ -51,6 +51,12 @@
     <!-- Controls -->
     <div class="controls">
 
+      <!-- Rename input -->
+      <div class="control-row rename-row">
+        <input type="text" id="rename-input" placeholder="Filename (without extension)" />
+        <div class="label-tag">Rename</div>
+      </div>
+
       <!-- Format select -->
       <div class="control-row">
         <select id="format-select" disabled>
@@ -58,14 +64,10 @@
         </select>
       </div>
 
-      <!-- Rename input -->
-      <div class="control-row rename-row">
-        <input type="text" id="rename-input" placeholder="Filename (without extension)" />
-      </div>
-
       <!-- Save path input -->
       <div class="control-row path-row">
         <input type="text" id="path-input" placeholder="Save folder (e.g. /home/user/Videos)" />
+        <button class="btn-browse" id="btn-browse">Browse</button>
       </div>
 
       <!-- Download row -->

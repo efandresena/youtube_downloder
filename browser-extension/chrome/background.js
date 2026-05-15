@@ -161,8 +161,8 @@ function sendNativeMessage(msg) {
 
     const timeout = setTimeout(() => {
       port.disconnect();
-      settle(reject, new Error("Native host timed out after 30 seconds."));
-    }, 30000);
+      settle(reject, new Error("Native host timed out after 15 seconds."));
+    }, 15000);
 
     port.onMessage.addListener((response) => {
       clearTimeout(timeout);

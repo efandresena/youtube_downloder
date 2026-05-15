@@ -1,27 +1,7 @@
-/**
- * YDM Popup Script — works for both Firefox (browser.*) and Chrome (chrome.*).
- *
- * Flow:
- *  1. On open: ping YDM server via background → show "no-app" if dead
- *  2. Query background for current tab's video info
- *  3. If no video info → show "no-video" view
- *  4. If video found  → show main view with thumbnail + title
- *  5. "Fetch Formats" → ask background to call native host get_formats
- *  6. Populate the format dropdown
- *  7. "Download" → ask background to call native host download
- *
- * NOTE: Firefox extensions expose `browser.*` natively.
- *       Chrome requires the webextension-polyfill or direct `chrome.*` calls.
- *       This file uses `browser.*`; the Chrome version uses `chrome.*` equivalents.
- */
-
 "use strict";
 
-// ─── API shim: allow this same file to run under Chrome if needed ──────────
-// (The chrome/ version uses chrome.* directly, but this comment documents intent.)
 const api = typeof browser !== "undefined" ? browser : chrome;
-
-// ─── DOM References ───────────────────────────────────────────────────────────
+const POPUP_TIMEOUT_MS = 20000;
 
 const views = {
   loading: document.getElementById("view-loading"),
@@ -35,11 +15,10 @@ const elVideoTitle = document.getElementById("video-title");
 const elFormatSelect = document.getElementById("format-select");
 const elRenameInput = document.getElementById("rename-input");
 const elPathInput = document.getElementById("path-input");
+const elBtnBrowse = document.getElementById("btn-browse");
 const elBtnDownload = document.getElementById("btn-download");
 const elStatusDot = document.getElementById("status-dot");
 const elStatusText = document.getElementById("status-text");
-
-// ─── View Helpers ─────────────────────────────────────────────────────────────
 
 function showView(name) {
   Object.entries(views).forEach(([key, el]) => {
@@ -47,15 +26,11 @@ function showView(name) {
   });
 }
 
-// ─── Status Helpers ───────────────────────────────────────────────────────────
-
 function setStatus(type, text) {
-  elStatusDot.className = "status-dot " + type; // idle | loading | success | error
+  elStatusDot.className = "status-dot " + type;
   elStatusText.className = "status-text " + (type === "loading" ? "" : type);
   elStatusText.textContent = text;
 }
-
-// ─── Format Filtering ─────────────────────────────────────────────────────────
 
 function filterAndSortFormats(formats) {
   let videoFormats = [];
@@ -112,25 +87,48 @@ function populateFormats(formats) {
   elBtnDownload.disabled = false;
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
+let currentVideoInfo = null;
+let formatError = false;
 
-let currentVideoInfo = null; // { url, title, videoId }
+function showRetryBtn(show) {
+  let btn = document.getElementById("btn-retry");
+  if (!btn && show) {
+    btn = document.createElement("button");
+    btn.id = "btn-retry";
+    btn.className = "btn-retry";
+    btn.textContent = "Retry";
+    btn.addEventListener("click", fetchFormats);
+    document.querySelector(".controls").appendChild(btn);
+  }
+  if (btn) btn.style.display = show ? "" : "none";
+}
 
-// ─── Initialisation ───────────────────────────────────────────────────────────
+function sendToBackground(msg) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Request timed out. Is YDM running?"));
+    }, POPUP_TIMEOUT_MS);
+
+    api.runtime.sendMessage(msg, (response) => {
+      clearTimeout(timer);
+      if (api.runtime.lastError) {
+        reject(new Error(api.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
 
 async function init() {
   showView("loading");
   setStatus("loading", "Connecting to YDM\u2026");
 
-  // Get current tab's video info from background.
-  // App availability is checked when the user clicks Fetch Formats/Download,
-  // because those paths go through native messaging to the local YDM server.
   let videoInfo = null;
   try {
     const resp = await sendToBackground({ action: "get_video_info" });
     videoInfo = resp && resp.videoInfo ? resp.videoInfo : null;
   } catch (err) {
-    // Background not responding
     showView("noApp");
     setStatus("error", "Cannot reach extension background.");
     return;
@@ -143,7 +141,6 @@ async function init() {
 
   currentVideoInfo = videoInfo;
 
-  // Populate the main view
   elThumbnail.src =
     "https://img.youtube.com/vi/" + videoInfo.videoId + "/hqdefault.jpg";
   elThumbnail.onerror = function () {
@@ -152,45 +149,28 @@ async function init() {
   };
   elVideoTitle.textContent = videoInfo.title || "(Unknown title)";
 
-  // Pre-fill rename input with video title
   elRenameInput.value = videoInfo.title || "";
-
-  // Pre-fill save path with default Downloads folder
   elPathInput.value = "~/Downloads";
 
-  // Reset controls
-  elFormatSelect.innerHTML = '<option value="">Loading formats…</option>';
+  elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   elFormatSelect.disabled = true;
   elBtnDownload.disabled = true;
 
   showView("main");
   setStatus("loading", "Fetching available formats\u2026");
 
-  // Auto-fetch formats
   await fetchFormats();
 }
-
-// ─── Message Helper ───────────────────────────────────────────────────────────
-
-function sendToBackground(msg) {
-  return new Promise((resolve, reject) => {
-    api.runtime.sendMessage(msg, (response) => {
-      if (api.runtime.lastError) {
-        reject(new Error(api.runtime.lastError.message));
-        return;
-      }
-      resolve(response);
-    });
-  });
-}
-
-// ─── Auto-fetch Formats ───────────────────────────────────────────────────────
 
 async function fetchFormats() {
   if (!currentVideoInfo) return;
 
+  showRetryBtn(false);
+  formatError = false;
+
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
+  elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   setStatus("loading", "Fetching available formats\u2026");
 
   try {
@@ -200,13 +180,17 @@ async function fetchFormats() {
     });
 
     if (resp && resp.error) {
+      formatError = true;
       setStatus("error", resp.error);
+      showRetryBtn(true);
       return;
     }
 
     const formats = (resp && resp.formats) ? resp.formats : resp;
     if (!Array.isArray(formats) || formats.length === 0) {
+      formatError = true;
       setStatus("error", "No formats returned by YDM server.");
+      showRetryBtn(true);
       return;
     }
 
@@ -214,11 +198,28 @@ async function fetchFormats() {
     const count = elFormatSelect.options.length;
     setStatus("success", count + " option(s) loaded.");
   } catch (err) {
+    formatError = true;
     setStatus("error", "Error: " + err.message);
+    showRetryBtn(true);
   }
 }
 
-// ─── Event: Download ─────────────────────────────────────────────────────────
+elBtnBrowse.addEventListener("click", async () => {
+  try {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.webkitdirectory = true;
+    input.style.display = "none";
+    input.addEventListener("change", () => {
+      if (input.files.length > 0) {
+        elPathInput.value = input.files[0].webkitRelativePath.split("/")[0] || input.files[0].path || elPathInput.value;
+      }
+    });
+    input.click();
+  } catch {
+    elPathInput.value = prompt("Enter download folder path:", elPathInput.value) || elPathInput.value;
+  }
+});
 
 elBtnDownload.addEventListener("click", async () => {
   if (!currentVideoInfo) return;
@@ -228,8 +229,6 @@ elBtnDownload.addEventListener("click", async () => {
     setStatus("error", "Please select a format first.");
     return;
   }
-
-  const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
 
   const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
   const customPath = elPathInput.value.trim() || "";
@@ -266,7 +265,5 @@ elBtnDownload.addEventListener("click", async () => {
     elFormatSelect.disabled = false;
   }
 });
-
-// ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", init);

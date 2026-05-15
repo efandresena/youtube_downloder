@@ -1,20 +1,6 @@
-/**
- * YDM Popup Script — Chrome/Brave (Manifest V3).
- *
- * Uses chrome.* API exclusively (no browser.* shim needed for Chrome).
- *
- * Flow:
- *  1. On open: query background for current tab's video info
- *  2. If no video info → show "no-video" view
- *  3. If video found  → show main view with thumbnail + title
- *  4. "Fetch Formats" → ask background to call native host get_formats
- *  5. Populate the format dropdown
- *  6. "Download" → ask background to call native host download
- */
-
 "use strict";
 
-// ─── DOM References ───────────────────────────────────────────────────────────
+const POPUP_TIMEOUT_MS = 20000;
 
 const views = {
   loading: document.getElementById("view-loading"),
@@ -28,11 +14,10 @@ const elVideoTitle   = document.getElementById("video-title");
 const elFormatSelect = document.getElementById("format-select");
 const elRenameInput  = document.getElementById("rename-input");
 const elPathInput    = document.getElementById("path-input");
+const elBtnBrowse    = document.getElementById("btn-browse");
 const elBtnDownload  = document.getElementById("btn-download");
 const elStatusDot    = document.getElementById("status-dot");
 const elStatusText   = document.getElementById("status-text");
-
-// ─── View Helpers ─────────────────────────────────────────────────────────────
 
 function showView(name) {
   Object.entries(views).forEach(([key, el]) => {
@@ -40,16 +25,11 @@ function showView(name) {
   });
 }
 
-// ─── Status Helpers ───────────────────────────────────────────────────────────
-
 function setStatus(type, text) {
-  // type: idle | loading | success | error
   elStatusDot.className = "status-dot " + type;
   elStatusText.className = "status-text " + (type === "loading" ? "" : type);
   elStatusText.textContent = text;
 }
-
-// ─── Format Filtering ─────────────────────────────────────────────────────────
 
 function filterAndSortFormats(formats) {
   let videoFormats = [];
@@ -106,15 +86,16 @@ function populateFormats(formats) {
   elBtnDownload.disabled = false;
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
-
 let currentVideoInfo = null;
-
-// ─── Message Helper ───────────────────────────────────────────────────────────
 
 function sendToBackground(msg) {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Request timed out. Is YDM running?"));
+    }, POPUP_TIMEOUT_MS);
+
     chrome.runtime.sendMessage(msg, (response) => {
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
@@ -124,13 +105,10 @@ function sendToBackground(msg) {
   });
 }
 
-// ─── Initialisation ───────────────────────────────────────────────────────────
-
 async function init() {
   showView("loading");
   setStatus("loading", "Connecting to YDM\u2026");
 
-  // Get current tab's video info from background service worker
   let videoInfo = null;
   try {
     const resp = await sendToBackground({ action: "get_video_info" });
@@ -148,38 +126,49 @@ async function init() {
 
   currentVideoInfo = videoInfo;
 
-  // Populate thumbnail and title
   elThumbnail.src = "https://img.youtube.com/vi/" + videoInfo.videoId + "/hqdefault.jpg";
   elThumbnail.onerror = function () {
     elThumbnail.src = "https://img.youtube.com/vi/" + videoInfo.videoId + "/mqdefault.jpg";
   };
   elVideoTitle.textContent = videoInfo.title || "(Unknown title)";
 
-  // Pre-fill rename input with video title
   elRenameInput.value = videoInfo.title || "";
-
-  // Pre-fill save path with default Downloads folder
   elPathInput.value = "~/Downloads";
 
-  // Reset controls
-  elFormatSelect.innerHTML = '<option value="">Loading formats…</option>';
+  elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   elFormatSelect.disabled = true;
   elBtnDownload.disabled = true;
 
   showView("main");
   setStatus("loading", "Fetching available formats\u2026");
 
-  // Auto-fetch formats
   await fetchFormats();
 }
 
-// ─── Auto-fetch Formats ───────────────────────────────────────────────────────
+let formatError = false;
+
+function showRetryBtn(show) {
+  let btn = document.getElementById("btn-retry");
+  if (!btn && show) {
+    btn = document.createElement("button");
+    btn.id = "btn-retry";
+    btn.className = "btn-retry";
+    btn.textContent = "Retry";
+    btn.addEventListener("click", fetchFormats);
+    document.querySelector(".controls").appendChild(btn);
+  }
+  if (btn) btn.style.display = show ? "" : "none";
+}
 
 async function fetchFormats() {
   if (!currentVideoInfo) return;
 
+  showRetryBtn(false);
+  formatError = false;
+
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
+  elFormatSelect.innerHTML = '<option value="">Loading formats\u2026</option>';
   setStatus("loading", "Fetching available formats\u2026");
 
   try {
@@ -189,13 +178,17 @@ async function fetchFormats() {
     });
 
     if (resp && resp.error) {
+      formatError = true;
       setStatus("error", resp.error);
+      showRetryBtn(true);
       return;
     }
 
     const formats = (resp && resp.formats) ? resp.formats : resp;
     if (!Array.isArray(formats) || formats.length === 0) {
+      formatError = true;
       setStatus("error", "No formats returned by YDM server.");
+      showRetryBtn(true);
       return;
     }
 
@@ -203,11 +196,24 @@ async function fetchFormats() {
     const count = elFormatSelect.options.length;
     setStatus("success", count + " option(s) loaded.");
   } catch (err) {
+    formatError = true;
     setStatus("error", "Error: " + err.message);
+    showRetryBtn(true);
   }
 }
 
-// ─── Event: Download ─────────────────────────────────────────────────────────
+elBtnBrowse.addEventListener("click", async () => {
+  try {
+    if (window.showDirectoryPicker) {
+      const dirHandle = await window.showDirectoryPicker();
+      elPathInput.value = dirHandle.name;
+    } else {
+      elPathInput.value = prompt("Enter download folder path:", elPathInput.value) || elPathInput.value;
+    }
+  } catch {
+    // user cancelled or API not available
+  }
+});
 
 elBtnDownload.addEventListener("click", async () => {
   if (!currentVideoInfo) return;
@@ -254,7 +260,5 @@ elBtnDownload.addEventListener("click", async () => {
     elFormatSelect.disabled = false;
   }
 });
-
-// ─── Boot ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", init);

@@ -44,7 +44,7 @@ log = logging.getLogger("ydm.native_host")
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 YDM_BASE_URL = "http://localhost:50123"
-REQUEST_TIMEOUT = 30  # seconds
+REQUEST_TIMEOUT = 15  # seconds
 
 # ── Binary I/O Helpers ────────────────────────────────────────────────────────
 
