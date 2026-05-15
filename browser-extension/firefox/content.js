@@ -43,6 +43,10 @@ let lastReportedVideoId = null;
 
 // ─── Core Detection Logic ─────────────────────────────────────────────────────
 
+function cleanVideoUrl(videoId) {
+  return "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+}
+
 function checkAndNotify() {
   const videoId = extractVideoId(window.location.href);
 
@@ -52,7 +56,7 @@ function checkAndNotify() {
 
     const payload = {
       action: "yt_video_detected",
-      url: window.location.href,
+      url: cleanVideoUrl(videoId),
       title: getCleanTitle(),
       videoId: videoId,
     };
