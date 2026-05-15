@@ -369,16 +369,29 @@ class DownloadRow(Gtk.ListBoxRow):
                 self._item.save_path or "",
                 self._item.filename or "",
             )
-            Gio.AppInfo.launch_default_for_uri(f"file://{filepath}", None)
+            Gio.AppInfo.launch_default_for_uri(
+                Gio.File.new_for_path(filepath).get_uri(), None
+            )
         except Exception as exc:
             logger.warning("open_file failed: %s", exc)
 
     def _on_open_folder(self, _btn: Gtk.Button) -> None:
+        import subprocess
+
+        folder = self._item.save_path or os.path.expanduser("~/Downloads")
         try:
-            folder = self._item.save_path or os.path.expanduser("~/Downloads")
-            Gio.AppInfo.launch_default_for_uri(f"file://{folder}", None)
-        except Exception as exc:
-            logger.warning("open_folder failed: %s", exc)
+            Gio.AppInfo.launch_default_for_uri(
+                Gio.File.new_for_path(folder).get_uri(), None
+            )
+        except Exception:
+            try:
+                subprocess.Popen(
+                    ["xdg-open", folder],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as exc2:
+                logger.warning("open_folder failed: %s", exc2)
 
     def _on_remove(self, _btn: Gtk.Button) -> None:
         try:
