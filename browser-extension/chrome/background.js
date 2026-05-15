@@ -106,6 +106,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       url: message.url,
       format_id: message.format_id,
       title: message.title,
+      save_path: message.save_path || "",
     })
       .then((response) => sendResponse(response))
       .catch((err) => sendResponse({ error: err.message }));

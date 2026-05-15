@@ -171,7 +171,7 @@ def handle_get_formats(url: str) -> dict:
         return {"error": f"Unexpected error: {exc}"}
 
 
-def handle_download(url: str, format_id: str, title: str) -> dict:
+def handle_download(url: str, format_id: str, title: str, save_path: str = "") -> dict:
     """Send a download request to the YDM app server."""
     if not url:
         return {"error": "No URL provided."}
@@ -182,6 +182,7 @@ def handle_download(url: str, format_id: str, title: str) -> dict:
         "url": url,
         "format_id": format_id,
         "title": title or "",
+        "save_path": save_path or "",
     }
 
     try:
@@ -222,6 +223,7 @@ def dispatch(message: dict) -> dict:
             url=message.get("url", ""),
             format_id=message.get("format_id", ""),
             title=message.get("title", ""),
+            save_path=message.get("save_path", ""),
         )
 
     log.warning("Unknown action: %r", action)

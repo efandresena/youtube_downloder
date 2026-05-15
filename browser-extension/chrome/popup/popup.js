@@ -27,6 +27,7 @@ const elThumbnail    = document.getElementById("thumbnail");
 const elVideoTitle   = document.getElementById("video-title");
 const elFormatSelect = document.getElementById("format-select");
 const elRenameInput  = document.getElementById("rename-input");
+const elPathInput    = document.getElementById("path-input");
 const elBtnDownload  = document.getElementById("btn-download");
 const elStatusDot    = document.getElementById("status-dot");
 const elStatusText   = document.getElementById("status-text");
@@ -157,6 +158,9 @@ async function init() {
   // Pre-fill rename input with video title
   elRenameInput.value = videoInfo.title || "";
 
+  // Pre-fill save path with default Downloads folder
+  elPathInput.value = "~/Downloads";
+
   // Reset controls
   elFormatSelect.innerHTML = '<option value="">Loading formats…</option>';
   elFormatSelect.disabled = true;
@@ -215,6 +219,7 @@ elBtnDownload.addEventListener("click", async () => {
   }
 
   const customTitle = elRenameInput.value.trim() || currentVideoInfo.title;
+  const customPath = elPathInput.value.trim() || "";
 
   elBtnDownload.disabled = true;
   elFormatSelect.disabled = true;
@@ -226,6 +231,7 @@ elBtnDownload.addEventListener("click", async () => {
       url: currentVideoInfo.url,
       format_id: formatId,
       title: customTitle,
+      save_path: customPath,
     });
 
     if (resp && resp.error) {

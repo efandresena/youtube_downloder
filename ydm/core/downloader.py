@@ -16,6 +16,7 @@ NOTE FOR GUI LAYER:
   Wrap any GTK mutations in GLib.idle_add() on the GUI side.
 """
 
+import glob
 import logging
 import os
 import threading
@@ -285,6 +286,10 @@ class Downloader:
     # Private: download thread body
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_title(title: str) -> str:
+        return "".join(c for c in title if c.isalnum() or c in " ._-()[]{}!@#$%^&'+,").strip()
+
     def _download_thread(
         self,
         item: DownloadItem,
@@ -297,11 +302,8 @@ class Downloader:
         download.  Calls *progress_callback* and *status_callback* as the
         download progresses or finishes.
         """
-        completed_filename = ""
 
         def _progress_hook(d: dict[str, Any]) -> None:
-            nonlocal completed_filename
-
             # ---- Handle cancel ----
             if state.cancel_event.is_set():
                 raise _CancelDownloadError("Download cancelled by user")
@@ -324,19 +326,15 @@ class Downloader:
                 except Exception as cb_exc:  # noqa: BLE001
                     logger.warning("progress_callback raised: %s", cb_exc)
 
-            elif dl_status == "finished":
-                completed_filename = d.get("filename", "")
-                logger.debug("yt-dlp finished hook, file=%s", completed_filename)
-
         # Build yt-dlp options
         save_path = item.save_path or str(Path.home() / "Downloads")
         is_audio_only = item.format_id.startswith("bestaudio")
 
-        # Use custom title if provided, otherwise let yt-dlp pull from metadata
         if item.title:
-            safe_title = "".join(c for c in item.title if c.isalnum() or c in " ._-()[]{}!@#$%^&'+,").strip()
+            safe_title = self._sanitize_title(item.title)
             outtmpl = os.path.join(save_path, safe_title + ".%(ext)s")
         else:
+            safe_title = None
             outtmpl = os.path.join(save_path, "%(title)s.%(ext)s")
 
         ydl_opts: dict[str, Any] = {
@@ -345,9 +343,7 @@ class Downloader:
             "quiet": True,
             "no_warnings": True,
             "progress_hooks": [_progress_hook],
-            # Merge best video+audio into a single container when applicable
             "merge_output_format": "mp4",
-            # Don't re-download files that already exist
             "nooverwrites": True,
         }
 
@@ -359,7 +355,6 @@ class Downloader:
                     "preferredquality": "192",
                 }
             ]
-            # Remove the merge format override for audio-only downloads
             ydl_opts.pop("merge_output_format", None)
 
         logger.info(
@@ -370,11 +365,26 @@ class Downloader:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([item.url])
 
-            # Determine the actual filename that was written
-            filename = (
-                os.path.basename(completed_filename) if completed_filename else ""
-            )
-            status_callback(DownloadStatus.COMPLETED, filename=filename)
+            # Determine actual filename on disk
+            if safe_title:
+                if is_audio_only:
+                    final_ext = "mp3"
+                else:
+                    final_ext = "mp4"
+                expected = os.path.join(save_path, f"{safe_title}.{final_ext}")
+                if os.path.exists(expected):
+                    actual_filename = os.path.basename(expected)
+                else:
+                    matches = sorted(
+                        glob.glob(os.path.join(save_path, f"{safe_title}*")),
+                        key=os.path.getmtime,
+                        reverse=True,
+                    )
+                    actual_filename = os.path.basename(matches[0]) if matches else ""
+            else:
+                actual_filename = ""
+
+            status_callback(DownloadStatus.COMPLETED, filename=actual_filename)
 
         except _CancelDownloadError:
             logger.info("Download %s was cancelled", item.id)

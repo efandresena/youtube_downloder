@@ -167,9 +167,10 @@ html, body {
   align-items: center;
 }
 
-/* ── Rename Input ─────────────────────────────────────────────────────────── */
+/* ── Input Fields ─────────────────────────────────────────────────────────── */
 
-.rename-row {
+.rename-row,
+.path-row {
   margin-top: 2px;
 }
 
