@@ -136,6 +136,17 @@ To distribute YDM as a Fedora RPM package, you would:
 
 ---
 
+## Support & Feedback
+
+- **Report bugs or request features** — open an issue at [github.com/efandresena/youtube_downloder/issues](https://github.com/efandresena/youtube_downloder/issues)
+- When reporting a problem, include:
+  - Your Linux distribution and version
+  - What you were doing when the issue occurred
+  - Any error messages from the terminal or log files (`~/.local/share/ydm/native_host.log`, `~/.local/share/ydm/logs/ydm.log`)
+  - Steps to reproduce the issue
+
+---
+
 ## License
 
 Personal use only. Respect YouTube's Terms of Service and copyright law.
